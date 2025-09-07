@@ -29,7 +29,6 @@ print("yfinance data")
 
 companies = ["^AEX", "ASML.AS", "AIR","ING", "WKL.AS", "STLA", "AD.AS", "PHG", "^FVX","^TNX", "^TYX", "^VIX"]
 
-
 session = requests.Session(impersonate="chrome")
 
 combined_Data = []

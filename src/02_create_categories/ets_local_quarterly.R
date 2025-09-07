@@ -16,13 +16,11 @@ library(funtimes)
 library(seastests)
 library(car)
 library(lmtest)
-
-# Time series plots
-# https://cran.rstudio.com/web/packages/ggfortify/vignettes/plot_ts.html
+library(tools)
 
 
-input_file     <- "C:/Users/jpark/vscode/Hackathon_Rabo_2025/data/02_processed_data/a0_combinedQuarterly_use_this.csv"
-output_folders <- "C:/Users/jpark/vscode/Hackathon_Rabo_2025/data/03_final_data/qt_data_extended/"
+input_file   <- "C:\\Users\\jpark\\vscode\\Hackathon_Rabo_2025\\src\\02_create_categories\\data\\quarterly_toMonthlydata_categorized.csv"
+output_file  <- "C:\\Users\\jpark\\vscode\\Hackathon_Rabo_2025\\src\\02_create_categories\\data\\quarterly_toMonthlydata_categorized_extended_useThis.csv"
 
 # Model consists of three letters following Hyndman (2008) and here: https://search.r-project.org/CRAN/refmans/forecast/html/ets.html
 
@@ -34,23 +32,12 @@ output_folders <- "C:/Users/jpark/vscode/Hackathon_Rabo_2025/data/03_final_data/
 #     ANN is simple exponential smoothing with additive errors.
 #     MAM is multiplicative Holt-Winters with multiplicative errors.
 
-print('################################')
-print('a02_1_forecast_quarter_ETS_v2')
 
-ENDDATE <- "2025-08-01"
-
-print('################################')
-print('CHECK END DATES')
-print(ENDDATE)
-print('################################')
-
-figures_dir  <- "C:/Users/jpark/vscode/Hackathon_Rabo_2025/data/03_final_data/qt_data_extended/figures/"
-forecasts_dir <- "C:/Users/jpark/vscode/Hackathon_Rabo_2025/data/03_final_data/qt_data_extended/forecasts/"
-
-PLOT_PRINT <- "TRUE"
+ENDDATE <- "2025-08-01" ######################################################################## Should be the last month of available data
+PLOT_PRINT <- "FALSE"
 
 ####################################
-horizon1 <- 4
+go_back_in_time <- 10
 finalforecastHorizon <- 10
 ####################################
 
@@ -63,15 +50,11 @@ appropriateModels <- c("ANNX", "ANAX", "ANMX",
                        "MANX", "MAAX", "MAMX",
                        "MAND", "MAAD", "MNMD",
                        "MMNX", "MMAX", "MMMX",
-                       "MMND", "MMAD", "MMMD"
-                       )
+                       "MMND", "MMAD", "MMMD")
 
 
 # load data
 dt1 <- read.csv(input_file, sep = ",")
-
-# TEST
-#dt1 <- dt1[,1:5] #############################################################
 
 rownames(dt1) <- dt1$X
 colnames(dt1)
@@ -81,40 +64,35 @@ allColumns <- colnames(dt1)
 # remove perioden column
 data_columns <- allColumns[c(-1)]
 
-# remove files
-do.call(file.remove, list(list.files(forecasts_dir, full.names = TRUE, pattern = "csv")))
-do.call(file.remove, list(list.files(figures_dir, full.names = TRUE, pattern = "png")))
-
 ##########################
 # start date
 ##########################
 start_date <- "1995-01-01"
-mystart = c(1995,1)
+mystart = c(1995,1,1)
 
-# last day of real data
-end_date <- ENDDATE
+### Last date of real data:
+end_date <- ENDDATE  # choose series with the most recent data (missing data will be forecasted)
 
 dt1 %>% filter(rownames(dt1) >= start_date &  rownames(dt1) <= end_date) -> dt1
-
-##########################
-##########################
-##########################
 
 ##########################
 # FOR LOOP
 ##########################
 
+list_of_forecasts <- list()
+count = 0
 for(colName in data_columns){ 
 
-  #print(colName)
+  count = count + 1
+  print(count)
 
-  # test case
-  # colName <- "gdp_total"
+  # Test column
+  #colName = "InternationalGDP_Germany_GDP"
 
   # connects all the data
   Key1 <- paste(Sys.Date(), "_", colName, sep="")
 
-  series1 <- ts(dt1[colName], frequency = 4, start=mystart)
+  series1 <- ts(dt1[colName], frequency = 12, start=mystart)
   series1 <- na.omit(series1)
 
   #########################
@@ -144,10 +122,9 @@ for(colName in data_columns){
                   model <- ets(data, model = mod, damped = TRUE)
 
                   out1 <- list(mod, model$aic, damped = TRUE)
-                  #print(out1[[2]])
               }
-      }, error=function(e){})
-      #}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})    
+        }, error=function(e){})
+      # }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})    
 
       new_aic <- out1[[2]]
 
@@ -178,21 +155,24 @@ for(colName in data_columns){
   } else {
     fit <- ets(series1, model=modelform, damped=TRUE)
   }
-  
+
   # Train Test Split (go_back_in_time is the period you want to go back in time)  
-  train <- head(series1, round(length(series1) - horizon1))
-  test <- tail(series1, horizon1)
+  train <- head(series1, round(length(series1) - go_back_in_time))
+  test <- tail(series1, go_back_in_time)
 
    if(dampform == "FALSE"){
     fit <- ets(train, model=modelform, damped=FALSE)
   } else {
     fit <- ets(train, model=modelform, damped=TRUE)
   }
-  forecasted1 <- forecast(fit, h=horizon1)
+  
+  forecasted_train <- forecast(fit, h=go_back_in_time)
 
-  png(filename=paste(figures_dir, Key1, "TrainTestForecast.png", sep = "_"))
-  print(autoplot(forecasted1, include=horizon1+2) + autolayer(test) + ggtitle(colName))
-  dev.off()
+  if (PLOT_PRINT == "TRUE"){
+    png(filename=paste(figures_dir, Key1, "TrainTestForecast.png", sep = "_"))
+    print(autoplot(forecasted_train, include=go_back_in_time+2) + autolayer(test) + ggtitle(colName))
+    dev.off()
+  }
 
   ####################
   # final forecast
@@ -206,9 +186,11 @@ for(colName in data_columns){
 
   forecast_oneMonth <- forecast(fit, h=finalforecastHorizon)
 
-  png(filename=paste(figures_dir, Key1, "final_forecasts.png", sep = "_"))
-  print(autoplot(tail(series1, 2)) + autolayer(forecast_oneMonth) + ggtitle(colName))
-  dev.off()
+  if (PLOT_PRINT == "TRUE"){
+    png(filename=paste(figures_dir, Key1, "final_forecasts.png", sep = "_"))
+    print(autoplot(tail(series1, 2)) + autolayer(forecast_oneMonth) + ggtitle(colName))
+    dev.off()
+  }
 
   ################################
   # Saving
@@ -222,32 +204,28 @@ for(colName in data_columns){
     SeriesName   = colName, 
     DateAnalysis = Sys.Date(), 
     ETSmodel = modelform,
-    ObservationDate = as.yearqtr(time(series1)),
+    ObservationDate = as.yearmon(time(series1)),
     RawData = series1
   )
   data$Key1 <- Key1
 
   colnames(data) <- c("SeriesName", "DateAnalysis", "ETSmodel", "ObservationDate", "RawData", "Key1")
 
-  write.table(data, file = paste(forecasts_dir, Key1, "RawData.csv", sep="_"), sep =",",row.names = FALSE)
-
   ###
   # TrainTestForecast
   ###
-  forecast_tibble <- as.data.frame(forecasted1)
+  forecast_tibble <- as.data.frame(forecast_oneMonth)
   forecast_tibble$Key1 <- Key1 
 
-  write.table(forecast_tibble, file = paste(forecasts_dir, Key1, "TrainTestForecast.csv", sep="_"), sep =",",row.names = FALSE)
+  
 
   ###
   # finalForecast
   ###
-  forecast_oneMonth <- forecast(fit, h=finalforecastHorizon)
-  finalForecast <- as.data.frame(forecast_oneMonth, row.names = NULL)
+  forecast_Months <- forecast(fit, h=finalforecastHorizon)
+  finalForecast <- as.data.frame(forecast_Months, row.names = NULL)
   finalForecast$Key1 <- Key1
   finalForecast <- tibble::rownames_to_column(finalForecast, "Forecast_Period")  
-
-  write.table(finalForecast, file = paste(forecasts_dir, Key1, "final_forecasts.csv", sep="_"), sep =",",row.names = FALSE)
 
   
 ###
@@ -257,27 +235,22 @@ for(colName in data_columns){
 
 # pick any chunk of data dataframe with same size as horizon
 forecastDF <- tail(data, finalforecastHorizon)
-forecastDF[c(5)] <- unclass(c(forecast_oneMonth$mean))
-forecastDF$ObservationDate <- as.yearqtr(time(forecast_oneMonth$mean))
+forecastDF[c(5)] <- unclass(c(forecast_Months$mean))
+forecastDF$ObservationDate <- as.yearmon(time(forecast_oneMonth$mean))
 
 data1 <- rbind(unclass(data), forecastDF)
 
-colnames(data1) <- c("SeriesName", "DateAnalysis", "ETSmodel", "ObservationDate", "RawData", "Key1")
-write.table(data1, file = paste(forecasts_dir, Key1, "Historical_Data.csv", sep="_"), sep =",",row.names = FALSE)
+colnames(data1) <- c("SeriesName", "DateAnalysis", "ETSmodel", "date", colName, "Key1")
+
+list_of_forecasts[[count]] <- data1[,c("date", colName)]
 
 } 
 
-
 ############# END LOOP ##############
 ############# END LOOP ##############
 ############# END LOOP ##############
 
+quarterly_combined_extended <- list_of_forecasts %>% reduce(full_join, by = "date")
 
 
-
-
-
-
-
-
-
+write.csv(quarterly_combined_extended, output_file, row.names = FALSE)

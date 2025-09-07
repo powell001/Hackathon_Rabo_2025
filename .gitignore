@@ -2,3 +2,12 @@
 *.png
 *.pyc
 *.idea/
+*.venv/
+data/01_get_data/mo_data/*.csv
+data/01_get_data/qt_data/*.csv
+data/03_final_data/mo_data_extended/forecasts/*.csv
+data/03_final_data/mo_data_extended/intermediate_data/*.csv
+data/03_final_data/mo_data_extended/figures/*.png
+data/03_final_data/qt_data_extended/forecasts/*.csv
+data/03_final_data/qt_data_extended/intermediate_data/*.csv
+data/03_final_data/qt_data_extended/figures/*.png
